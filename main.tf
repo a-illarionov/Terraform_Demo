@@ -1,29 +1,8 @@
-# Configure the Azure provider
-terraform {
-  required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 2.65"
-    }
-  }
-
-  required_version = ">= 0.14.9"
-}
-
-#Terraform setting value to subscription ID
-
-provider "azurerm" {
-  features {
-
-  }
-  subscription_id = var.subscription_id
-}
 #Create Resource Group
 resource "azurerm_resource_group" "main" {
   name     = "${var.environment}-rg-${var.location}"
   location = var.location
 }
-
 #Call modules
 
 #existing resources
@@ -33,18 +12,21 @@ module "networkhub" {
   existingrg    = var.existingrg
   existing_vnet = var.existing_vnet
 }
-#Key Vault Module
+
+#Key Vault Module - retrieve password from key vault 
 module "KeyVaultSecrets" {
-  source = "./Modules/KeyVault"
-  kv     = var.kv
+  source  = "./Modules/KeyVault"
+  kv      = var.kv
+  secrets = var.secrets
 }
+
 #Networking Modules
 module "vnet" {
-  source              = "./Modules/Vnets"
+  source              = "./Modules/VNets"
   resource_group_name = azurerm_resource_group.main.name
   location            = var.location
   environment         = var.environment
-  vnet_name           = "vnet-${var.location}-${azurerm_resource_group.main.name}-${var.environment}"
+  vnet_name           = "vnet-${var.location}-${azurerm_resource_group.main.name}"
   address_space       = var.address_space
   tags                = merge(local.common_tags, local.extra_tags)
 }
@@ -58,17 +40,18 @@ module "subnet" {
 
   subnets = [
     {
-      name   = "subnet-${var.location}-${azurerm_resource_group.main.name}-${var.environment}"
+      name   = "subnet-${var.location}-${azurerm_resource_group.main.name}"
       prefix = "${var.subnets}"
     }
   ]
 }
 #Virtual Machines Module
 module "windowsserver" {
-  source              = "./Modules/Virtual Machines"
+  source              = "./Modules/VM"
   resource_group_name = azurerm_resource_group.main.name
   location            = var.location
   environment         = var.environment
+  vm_sku              = var.vm_sku
   subnet_id           = module.subnet.vnet_subnets
   mysecret            = module.KeyVaultSecrets.mysecret
   source_ip           = var.source_ip
@@ -77,13 +60,13 @@ module "windowsserver" {
 }
 #Vnet peering module
 module "vnet_peering" {
-  source                    = "./Modules/Vnet Peering"
+  source                    = "./Modules/VNetPeering"
   location                  = var.location
   resource_group_name       = azurerm_resource_group.main.name
   environment               = var.environment
   vnet_name                 = module.vnet.vnet_name
-  resource_group_onprem     = module.networkhub.resource_group_hub
-  on_prem_vnet              = module.networkhub.hub_vnet_name
+  resource_group_hub        = module.networkhub.resource_group_hub
+  hub_vnet                  = module.networkhub.hub_vnet_name
   remote_virtual_network_id = module.vnet.vnet_id
-  onprem_virtual_network_id = module.networkhub.hub_vnet_id
+  hub_virtual_network_id    = module.networkhub.hub_vnet_id
 }

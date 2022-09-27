@@ -1,0 +1,10 @@
+subscription_id = # subscription to deploy resources
+kv              = #key vault resource ID
+location        = #Azure region for deployent
+address_space   = #virtual network address space
+subnets         = #subnet address space
+environment     = #environment to deploy
+source_ip       = #public IP for NSGs for RDP
+capacity        = #amount of VMs to deploy
+secrets     = #key vault secret name
+vm_sku = #vm sku
